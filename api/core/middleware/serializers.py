@@ -1,4 +1,5 @@
 import falcon
+import json
 from marshmallow import ValidationError
 
 from core.errors import HTTPError
@@ -14,6 +15,6 @@ class SerializerMiddleware:
             req_data = req.stream.read(req.content_length)
 
             try:
-                req.context.serializer = serializer().load(data=req_data)
+                req.context.serializer = serializer().load(data=json.loads(req_data))
             except ValidationError as err:
                 raise HTTPError(status=falcon.HTTP_422, errors=err.messages)
