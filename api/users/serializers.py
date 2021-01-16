@@ -43,4 +43,3 @@ class OrganisationPatchRequestSchema(StrictSchema):
         required=True,
         validate=validate_organisation_exists
     )
-
