@@ -7,7 +7,6 @@ from core.validators import validate_object_id
 from organisations.models import Organisation
 from organisations.serializers import (
     OrganisationGetRequestSchema,
-    OrganisationPatchRequestSchema
 )
 from organisations.v1.api import OrganisationCollectionResourceV1, OrganisationResourceV1
 from organisations.v2.api import OrganisationCollectionResourceV2, OrganisationResourceV2
@@ -15,7 +14,7 @@ from organisations.v2.api import OrganisationCollectionResourceV2, OrganisationR
 
 class OrganisationCollectionResourceProxy:
     """
-    OrganisationCollection Resource proxy.
+    OrganisationCollectionResource proxy.
     """
     @use_args(OrganisationGetRequestSchema)
     def on_get(self, req, resp, params):
@@ -62,12 +61,12 @@ class OrganisationCollectionResourceProxy:
 @falcon.before(get_instance, Organisation)
 class OrganisationResourceProxy:
     """
-    Organisation resourceproxy.
+    OrganisationResource proxy.
     """
 
     def on_get(self, req, resp, object_id):
         """
-        Get Object instance details
+        Get Proxy
 
         Args:
             req (falcon.request.Request): Request object
@@ -88,7 +87,7 @@ class OrganisationResourceProxy:
 
     def on_patch(self, req, resp, object_id):
         """
-        Update Object instance details
+        Patch Proxy
 
         Args:
             req (falcon.request.Request): Request object
@@ -109,7 +108,7 @@ class OrganisationResourceProxy:
 
     def on_delete(self, req, resp, object_id):
         """
-        Delete Object instance
+        Delete Proxy
 
         Args:
             req (falcon.request.Request): Request object
@@ -127,4 +126,3 @@ class OrganisationResourceProxy:
             controller = OrganisationResourceV2()
 
         controller.on_delete(req, resp, object_id)
-

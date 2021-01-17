@@ -4,7 +4,7 @@ from webargs.falconparser import use_args
 
 from core.hooks import get_instance
 from users.models import User
-from users.serializers import UserGetRequestSchema, OrganisationPatchRequestSchema, UserPostRequestSchema
+from users.serializers import UserGetRequestSchema, UserPatchRequestSchema, UserPostRequestSchema
 from core.validators import validate_object_id
 
 from users.v1.api import UserCollectionResourceV1, UserResourceV1
@@ -13,7 +13,7 @@ from users.v2.api import UserCollectionResourceV2, UserResourceV2
 
 class UserCollectionResourceProxy:
     """
-    User API methods to handle listing, searching, sorting and create new instance.
+        UserCollectionResource Proxy. Redirect to proper habdler dpending on version number
     """
     serializers = {
         'post': UserPostRequestSchema
@@ -59,15 +59,15 @@ class UserCollectionResourceProxy:
 @falcon.before(get_instance, User)
 class UserResourceProxy:
     """
-    Organisation API methods to handle single instance.
+    UserResource Proxy. Redirect to proper habdler dpending on version number
     """
     serializers = {
-        'patch': OrganisationPatchRequestSchema
+        'patch': UserPatchRequestSchema
     }
 
     def on_get(self, req, resp, object_id):
         """
-        Get Object instance details
+        Get proxy
 
         Args:
             req (falcon.request.Request): Request object
@@ -88,7 +88,7 @@ class UserResourceProxy:
 
     def on_patch(self, req, resp, object_id):
         """
-        Update Object instance details
+        Patch proxy
 
         Args:
             req (falcon.request.Request): Request object
@@ -109,7 +109,7 @@ class UserResourceProxy:
 
     def on_delete(self, req, resp, object_id):
         """
-        Delete Object instance
+        Delete Proxy
 
         Args:
             req (falcon.request.Request): Request object
