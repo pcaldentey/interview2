@@ -1,12 +1,12 @@
 """
-    User creation, deletion, update and query tests
+    (VERSION 1) User creation, deletion, update and query tests
 """
 
 import pytest
 
 from unittest.mock import ANY
 
-from falcon import HTTP_200, HTTP_201, HTTP_204, HTTP_404, HTTP_422
+from falcon import HTTP_200, HTTP_204, HTTP_404, HTTP_422
 
 from users.tests.test_api import BaseUserTestCase
 
@@ -161,94 +161,4 @@ class UserGetTestCase(BaseUserTestCase):
         self.assertDictEqual(
             response.json,
             {"title": "404 Not Found"}
-        )
-
-
-@pytest.mark.apiv1
-class UserPostTestCase(BaseUserTestCase):
-    def test_create_user(self):
-        organisation = self.create_organisation('Die Hard')
-
-        response = self.request_post(
-            path=PATH,
-            status=HTTP_201,
-            body={
-                'first_name': 'John',
-                'last_name': 'McClane',
-                'email': 'john@example.com',
-                'organisation_id': organisation.id
-            }
-        )
-        self.assertDictEqual(
-            response.json,
-            {"id": ANY, "name": "John McClane", "email": "john@example.com"}
-        )
-
-    def test_create_user_unexisting_organisation_error(self):
-        """ User of a non existing organisation """
-        response = self.request_post(
-            path=PATH,
-            status=HTTP_422,
-            body={
-                'first_name': 'John',
-                'last_name': 'McClane',
-                'email': 'john@example.com',
-                'organisation_id': 0
-            }
-        )
-        self.assertDictEqual(
-            response.json,
-            {"title": "422 Unprocessable Entity",
-             "errors": {
-                "organisation_id": ["Organisation with given ID (0) does not exist"]
-                }
-             }
-        )
-
-    def test_create_user_null_values_error(self):
-        """ User with None values """
-        response = self.request_post(
-            path=PATH,
-            status=HTTP_422,
-            body={
-                'first_name': None,
-                'last_name': None,
-                'email': None,
-                'organisation_id': None
-            }
-        )
-        self.assertDictEqual(
-            response.json,
-            {"title": "422 Unprocessable Entity",
-             "errors": {
-                "email": ["Field may not be null."],
-                "first_name": ["Field may not be null."],
-                "last_name": ["Field may not be null."],
-                "organisation_id": ["Field may not be null."]
-                }
-             }
-        )
-
-    def test_create_user_validation_error(self):
-        """ User with not valid values """
-        response = self.request_post(
-            path=PATH,
-            status=HTTP_422,
-            body={
-                'first_name': 1,
-                'last_name': 1,
-                'email': 'johnexample.com',
-                'organisation_id': 'fake_id'
-            }
-        )
-        self.assertDictEqual(
-            response.json,
-            {"title": "422 Unprocessable Entity",
-             "errors": {
-                'email': ['Not a valid email address.', 'Not a valid email address.'],
-                'first_name': ['Not a valid string.'],
-                'last_name': ['Not a valid string.'],
-                'organisation_id': ['Not a valid integer.']
-                }
-             }
         )
