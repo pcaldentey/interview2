@@ -30,7 +30,7 @@ class UserPostRequestSchema(StrictSchema):
     )
 
 
-class OrganisationPatchRequestSchema(StrictSchema):
+class UserPatchRequestSchema(StrictSchema):
     first_name = String(
         required=True,
         validate=validate.Length(max=128)
