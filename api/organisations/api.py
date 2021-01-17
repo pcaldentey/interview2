@@ -9,13 +9,13 @@ from organisations.serializers import (
     OrganisationGetRequestSchema,
     OrganisationPatchRequestSchema
 )
-from organisations.v1.api import OrganisationCollectionResourceV1
-from organisations.v2.api import OrganisationCollectionResourceV2
+from organisations.v1.api import OrganisationCollectionResourceV1, OrganisationResourceV1
+from organisations.v2.api import OrganisationCollectionResourceV2, OrganisationResourceV2
 
 
 class OrganisationCollectionResourceProxy:
     """
-    Organisation API methods to handle listing, searching, sorting and create new instance.
+    OrganisationCollection Resource proxy.
     """
     @use_args(OrganisationGetRequestSchema)
     def on_get(self, req, resp, params):
@@ -60,13 +60,10 @@ class OrganisationCollectionResourceProxy:
 
 @falcon.before(validate_object_id, Organisation)
 @falcon.before(get_instance, Organisation)
-class OrganisationResource:
+class OrganisationResourceProxy:
     """
-    Organisation API methods to handle single instance.
+    Organisation resourceproxy.
     """
-    serializers = {
-        'patch': OrganisationPatchRequestSchema
-    }
 
     def on_get(self, req, resp, object_id):
         """
@@ -80,7 +77,14 @@ class OrganisationResource:
         Returns:
             (falcon.response.Response): Organisation instance details
         """
-        resp.media = self.build_response(req.context['instance'], req.context['version'])
+        version = req.context['version']
+        if version == 1:
+            controller = OrganisationResourceV1()
+
+        elif version == 2:
+            controller = OrganisationResourceV2()
+
+        controller.on_get(req, resp, object_id)
 
     def on_patch(self, req, resp, object_id):
         """
@@ -94,15 +98,14 @@ class OrganisationResource:
         Raises::
             (HTTPNotFound): Organisation instance does not exist
         """
-        serialized_data = req.context['serializer']
-        db_session = req.context['db_session']
-        instance = req.context['instance']
+        version = req.context['version']
+        if version == 1:
+            controller = OrganisationResourceV1()
 
-        if serialized_data:
-            instance.update(db_session, commit=False, **serialized_data)
+        elif version == 2:
+            controller = OrganisationResourceV2()
 
-        db_session.commit()
-        resp.status = falcon.HTTP_204
+        controller.on_patch(req, resp, object_id)
 
     def on_delete(self, req, resp, object_id):
         """
@@ -116,40 +119,12 @@ class OrganisationResource:
         Raises::
             (HTTPNotFound): Organisation instance does not exist
         """
-        instance = req.context['instance']
+        version = req.context['version']
+        if version == 1:
+            controller = OrganisationResourceV1()
 
-        users_no = len(instance.users)
-        if users_no > 0:
-            raise falcon.HTTPConflict(
-                f'This Organisation is assign to {users_no} airport(s). Remove users before delete!'
-            )
+        elif version == 2:
+            controller = OrganisationResourceV2()
 
-        response = Organisation.delete_by_id(req.context['db_session'], object_id)
-        resp.status = falcon.HTTP_204 if response else falcon.HTTP_404
+        controller.on_delete(req, resp, object_id)
 
-    @staticmethod
-    def build_response(instance, version):
-        """
-        Create dict with full organisation data.
-
-        Args:
-            instance (Organisation): Organisation instance
-            version (str|None): Current API version
-
-        Returns:
-            (dict): Organisation instance details
-        """
-        keys = ('id', 'name', 'status_name')
-
-        if version and version > 1.0:
-            keys += ('enable_user_login', )
-
-        response = instance.convert_object_to_dict(keys)
-
-        if version and version > 1.0:
-            response['users'] = [
-                item.convert_object_to_dict(('id', 'name', 'email', 'state_name'))
-                for item in instance.users
-            ]
-
-        return response

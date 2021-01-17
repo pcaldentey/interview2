@@ -7,7 +7,7 @@ from core.middleware.serializers import SerializerMiddleware
 from core.middleware.version import VersionMiddleware
 from core.serializers.errors import error_serializer
 
-from organisations.api import OrganisationResource, OrganisationCollectionResourceProxy
+from organisations.api import OrganisationResourceProxy, OrganisationCollectionResourceProxy
 from users.api import UserResource, UserCollectionResource
 
 
@@ -21,6 +21,6 @@ app = falcon.API(middleware=[
 app.set_error_serializer(error_serializer)
 
 app.add_route('/{api_version}/organisations/', OrganisationCollectionResourceProxy())
-app.add_route('/{api_version}/organisations/{object_id}', OrganisationResource())
+app.add_route('/{api_version}/organisations/{object_id}', OrganisationResourceProxy())
 app.add_route('/{api_version}/users/', UserCollectionResource())
 app.add_route('/{api_version}/users/{object_id}', UserResource())
