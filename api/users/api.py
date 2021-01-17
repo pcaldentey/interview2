@@ -1,113 +1,63 @@
 import falcon
 
-from sqlalchemy import cast, or_, String, func
 from webargs.falconparser import use_args
 
-from core.api import BaseSortingAPI
 from core.hooks import get_instance
 from users.models import User
 from users.serializers import UserGetRequestSchema, OrganisationPatchRequestSchema, UserPostRequestSchema
 from core.validators import validate_object_id
 
+from users.v1.api import UserCollectionResourceV1, UserResourceV1
+from users.v2.api import UserCollectionResourceV2, UserResourceV2
 
-class UserCollectionResource(BaseSortingAPI):
+
+class UserCollectionResourceProxy:
     """
     User API methods to handle listing, searching, sorting and create new instance.
     """
     serializers = {
         'post': UserPostRequestSchema
     }
-    model = User
-    sorting_mapper = {
-        'first_name': func.lower(User.first_name),
-        'last_name': func.lower(User.last_name),
-    }
 
     @use_args(UserGetRequestSchema, location="query")
     def on_get(self, req, resp, params):
         """
-        Get list of all Users
+        Get Post UserCollection Proxy
 
         Args:
             req (falcon.request.Request): Request object
             resp (falcon.response.Response): Response object
         """
-        paginated_filtered_result, total_objects = self.get_objects(
-            req.context.db_session, params
-        )
+        version = req.context['version']
+        if not version or version == 1:
+            controller = UserCollectionResourceV1()
 
-        resp.media = self.build_response(
-            total=total_objects,
-            data=paginated_filtered_result,
-            version=req.context['version']
-        )
+        elif version == 2:
+            controller = UserCollectionResourceV2()
+
+        controller.on_get(req, resp, params)
 
     def on_post(self, req, resp):
         """
-        Post create Organisation instance
+        Post UserCollection Proxy
 
         Args:
             req (falcon.request.Request): Request object
             resp (falcon.response.Response): Response object
         """
-        serializer = req.context['serializer']
-        db_session = req.context['db_session']
+        version = req.context['version']
+        if not version or version == 1:
+            controller = UserCollectionResourceV1()
 
-        user = self.model.create(db_session, **serializer)
-        resp.status = falcon.HTTP_201
-        keys = ('id', 'name', 'email')
+        elif version == 2:
+            controller = UserCollectionResourceV2()
 
-        if req.context['version'] and req.context['version'] > 1:
-            keys += ('state_name', )
-
-        resp.media = user.convert_object_to_dict(keys)
-
-    def build_query_filters(self, params):
-        """
-        Build filters list based on provided query parameters.
-        """
-        search_terms = params.get('search')
-
-        if not search_terms:
-            return []
-
-        filters = []
-
-        for search_term in search_terms:
-            search_term = f'%{search_term.strip()}%'
-            filters.append(or_(*[
-                self.model.last_name.ilike(search_term),
-                self.model.first_name.ilike(search_term),
-                self.model.email.ilike(search_term),
-                cast(self.model.id, String).ilike(search_term),
-            ]))
-
-        return filters
-
-    @staticmethod
-    def build_response(total, data, version):
-        """
-        Build response in proper format
-
-        Args:
-            total (int): total number of airports
-            data (list): list of Airport instances
-            version (str|None): Current API version
-        """
-        keys = ('id', 'name', 'email')
-
-        if version and version > 1:
-            keys += ('state_name', )
-
-        return {
-            'total': total,
-            'data': [item.convert_object_to_dict(keys) for item in data]
-        }
+        controller.on_post(req, resp)
 
 
 @falcon.before(validate_object_id, User)
 @falcon.before(get_instance, User)
-class UserResource:
+class UserResourceProxy:
     """
     Organisation API methods to handle single instance.
     """
@@ -127,7 +77,14 @@ class UserResource:
         Returns:
             (falcon.response.Response): User instance details
         """
-        resp.media = self.build_response(req.context['instance'], req.context['version'])
+        version = req.context['version']
+        if not version or version == 1:
+            controller = UserResourceV1()
+
+        elif version == 2:
+            controller = UserResourceV2()
+
+        controller.on_get(req, resp, object_id)
 
     def on_patch(self, req, resp, object_id):
         """
@@ -141,15 +98,14 @@ class UserResource:
         Raises::
             (HTTPNotFound): User instance does not exist
         """
-        serialized_data = req.context['serializer']
-        db_session = req.context['db_session']
-        instance = req.context['instance']
+        version = req.context['version']
+        if not version or version == 1:
+            controller = UserResourceV1()
 
-        if serialized_data:
-            instance.update(db_session, commit=False, **serialized_data)
+        elif version == 2:
+            controller = UserResourceV2()
 
-        db_session.commit()
-        resp.status = falcon.HTTP_204
+        controller.on_patch(req, resp, object_id)
 
     def on_delete(self, req, resp, object_id):
         """
@@ -163,26 +119,11 @@ class UserResource:
         Raises::
             (HTTPNotFound): User instance does not exist
         """
-        response = User.delete_by_id(req.context['db_session'], object_id)
-        resp.status = falcon.HTTP_204 if response else falcon.HTTP_404
+        version = req.context['version']
+        if not version or version == 1:
+            controller = UserResourceV1()
 
-    @staticmethod
-    def build_response(instance, version):
-        """
-        Create dict with full user data.
+        elif version == 2:
+            controller = UserResourceV2()
 
-        Args:
-            instance (User): User instance
-            version (str|None): Current API version
-
-        Returns:
-            (dict): User instance details
-        """
-        keys = ('id', 'name', 'email')
-
-        if version and version > 1:
-            keys += ('state_name', )
-
-        response = instance.convert_object_to_dict(keys)
-        response['organisation'] = instance.organisation.name
-        return response
+        controller.on_delete(req, resp, object_id)

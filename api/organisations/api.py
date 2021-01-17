@@ -1,36 +1,26 @@
 import falcon
 
-from sqlalchemy import cast, or_, String, func
 from webargs.falconparser import use_args
 
-from core.api import BaseSortingAPI
 from core.hooks import get_instance
 from core.validators import validate_object_id
 from organisations.models import Organisation
 from organisations.serializers import (
     OrganisationGetRequestSchema,
-    OrganisationPatchRequestSchema,
-    OrganisationPostRequestSchema
+    OrganisationPatchRequestSchema
 )
+from organisations.v1.api import OrganisationCollectionResourceV1, OrganisationResourceV1
+from organisations.v2.api import OrganisationCollectionResourceV2, OrganisationResourceV2
 
 
-class OrganisationCollectionResource(BaseSortingAPI):
+class OrganisationCollectionResourceProxy:
     """
-    Organisation API methods to handle listing, searching, sorting and create new instance.
+    OrganisationCollection Resource proxy.
     """
-    serializers = {
-        'post': OrganisationPostRequestSchema
-    }
-    model = Organisation
-    sorting_mapper = {
-        'name': func.lower(Organisation.name),
-        'id': Organisation.id,
-    }
-
     @use_args(OrganisationGetRequestSchema)
     def on_get(self, req, resp, params):
         """
-        Get Organisation instance list
+        Get Proxy
 
         Args:
             req (falcon.request.Request): Request object
@@ -41,88 +31,39 @@ class OrganisationCollectionResource(BaseSortingAPI):
             (dict): Organisation instance list and total number
         """
 
-        paginated_filtered_result, total_objects = self.get_objects(req.context.db_session, params)
+        version = req.context['version']
+        if version == 1:
+            controller = OrganisationCollectionResourceV1()
 
-        resp.media = self.build_response(
-            total=total_objects,
-            data=paginated_filtered_result,
-            version=req.context['version']
-        )
+        elif version == 2:
+            controller = OrganisationCollectionResourceV2()
+
+        controller.on_get(req, resp, params)
 
     def on_post(self, req, resp):
         """
-        Post create Organisation instance
+        Post proxy
 
         Args:
             req (falcon.request.Request): Request object
             resp (falcon.response.Response): Response object
         """
-        serializer = req.context['serializer']
-        db_session = req.context['db_session']
+        version = req.context['version']
+        if version == 1:
+            controller = OrganisationCollectionResourceV1()
 
-        organisation = self.model.create(db_session, **serializer)
-        resp.status = falcon.HTTP_201
-        resp.media = organisation.convert_object_to_dict(('id', 'name', 'status_name'))
+        elif version == 2:
+            controller = OrganisationCollectionResourceV2()
 
-    def build_query_filters(self, params):
-        """
-        Create filter for search purpose
-
-        Args:
-            params (dict): Query params
-
-        Returns:
-            (list): List of filters to be applied
-        """
-        search_terms = params.get('search')
-
-        if not search_terms:
-            return []
-
-        filters = []
-
-        for search_term in search_terms:
-            search_term = f'%{search_term.strip()}%'
-            filters.append(or_(*[
-                self.model.name.ilike(search_term),
-                cast(self.model.id, String).ilike(search_term),
-            ]))
-
-        return filters
-
-    @staticmethod
-    def build_response(total, data, version):
-        """
-        Build response in proper format
-
-        Args:
-            total (int): total number of airports
-            data (list): list of Airport instances
-            version (str|None): Current API version
-
-        Returns:
-            (dict) with basic airport data
-        """
-        keys = ('id', 'name')
-
-        if version and version > 1.0:
-            keys += ('status_name',)
-
-        return {
-            'total': total,
-            'data': [item.convert_object_to_dict(keys) for item in data]
-        }
+        controller.on_post(req, resp)
 
 
 @falcon.before(validate_object_id, Organisation)
 @falcon.before(get_instance, Organisation)
-class OrganisationResource:
+class OrganisationResourceProxy:
     """
-    Organisation API methods to handle single instance.
+    Organisation resourceproxy.
     """
-    serializers = {
-        'patch': OrganisationPatchRequestSchema
-    }
 
     def on_get(self, req, resp, object_id):
         """
@@ -136,7 +77,14 @@ class OrganisationResource:
         Returns:
             (falcon.response.Response): Organisation instance details
         """
-        resp.media = self.build_response(req.context['instance'], req.context['version'])
+        version = req.context['version']
+        if version == 1:
+            controller = OrganisationResourceV1()
+
+        elif version == 2:
+            controller = OrganisationResourceV2()
+
+        controller.on_get(req, resp, object_id)
 
     def on_patch(self, req, resp, object_id):
         """
@@ -150,15 +98,14 @@ class OrganisationResource:
         Raises::
             (HTTPNotFound): Organisation instance does not exist
         """
-        serialized_data = req.context['serializer']
-        db_session = req.context['db_session']
-        instance = req.context['instance']
+        version = req.context['version']
+        if version == 1:
+            controller = OrganisationResourceV1()
 
-        if serialized_data:
-            instance.update(db_session, commit=False, **serialized_data)
+        elif version == 2:
+            controller = OrganisationResourceV2()
 
-        db_session.commit()
-        resp.status = falcon.HTTP_204
+        controller.on_patch(req, resp, object_id)
 
     def on_delete(self, req, resp, object_id):
         """
@@ -172,40 +119,12 @@ class OrganisationResource:
         Raises::
             (HTTPNotFound): Organisation instance does not exist
         """
-        instance = req.context['instance']
+        version = req.context['version']
+        if version == 1:
+            controller = OrganisationResourceV1()
 
-        users_no = len(instance.users)
-        if users_no > 0:
-            raise falcon.HTTPConflict(
-                f'This Organisation is assign to {users_no} airport(s). Remove users before delete!'
-            )
+        elif version == 2:
+            controller = OrganisationResourceV2()
 
-        response = Organisation.delete_by_id(req.context['db_session'], object_id)
-        resp.status = falcon.HTTP_204 if response else falcon.HTTP_404
+        controller.on_delete(req, resp, object_id)
 
-    @staticmethod
-    def build_response(instance, version):
-        """
-        Create dict with full organisation data.
-
-        Args:
-            instance (Organisation): Organisation instance
-            version (str|None): Current API version
-
-        Returns:
-            (dict): Organisation instance details
-        """
-        keys = ('id', 'name', 'status_name')
-
-        if version and version > 1.0:
-            keys += ('enable_user_login', )
-
-        response = instance.convert_object_to_dict(keys)
-
-        if version and version > 1.0:
-            response['users'] = [
-                item.convert_object_to_dict(('id', 'name', 'email', 'state_name'))
-                for item in instance.users
-            ]
-
-        return response
