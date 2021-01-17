@@ -23,7 +23,7 @@ class UserCollectionResource(BaseSortingAPI):
         'last_name': func.lower(User.last_name),
     }
 
-    @use_args(UserGetRequestSchema)
+    @use_args(UserGetRequestSchema, location="query")
     def on_get(self, req, resp, params):
         """
         Get list of all Users
