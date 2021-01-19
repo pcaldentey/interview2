@@ -1,11 +1,13 @@
+"""
+    (VERSION 2) User endpoint resources
+"""
 import falcon
 
 from sqlalchemy import cast, or_, String, func
-from webargs.falconparser import use_args
 
 from core.api import BaseSortingAPI
 from users.models import User
-from users.serializers import UserGetRequestSchema, OrganisationPatchRequestSchema, UserPostRequestSchema
+from users.serializers import UserPatchRequestSchema, UserPostRequestSchema
 
 
 class UserCollectionResourceV2(BaseSortingAPI):
@@ -99,7 +101,7 @@ class UserResourceV2:
     Organisation API methods to handle single instance.
     """
     serializers = {
-        'patch': OrganisationPatchRequestSchema
+        'patch': UserPatchRequestSchema
     }
 
     def on_get(self, req, resp, object_id):
