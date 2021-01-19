@@ -9,14 +9,12 @@ from app import app
 from core.db.session import Session
 
 
-ScopedSession = scoped_session(Session)
-
-
 class BaseDBTestCase(TestCase):
     """Assign Session to TestCase."""
 
     def setUp(self):
         super().setUp()
+        ScopedSession = scoped_session(Session)
         self.db_session = ScopedSession()
 
 
